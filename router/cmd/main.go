@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"go.uber.org/zap"
+	"go.uber.org/zap" 
 
 	"github.com/wundergraph/cosmo/router/internal/profile"
 )
@@ -47,7 +47,14 @@ func Main() {
 		log.Fatal("Could not parse log level", zap.Error(err))
 	}
 
-	logger := logging.New(!result.Config.JSONLog, result.Config.LogLevel == "debug", logLevel).
+	// Create the log file
+	logFile, err := logging.NewLogFile(result.Config.LogDestination)
+	if err != nil {
+		log.Fatal("Could not create log file", zap.Error(err))
+	}
+	defer logFile.Close()
+
+	logger := logging.New(!result.Config.JSONLog, logFile, result.Config.LogLevel == "debug", logLevel).
 		With(
 			zap.String("component", "@wundergraph/router"),
 			zap.String("service_version", core.Version),

@@ -118,6 +118,7 @@
   "IntrospectionEnabled": true,
   "LogLevel": "info",
   "JSONLog": true,
+  "LogDestination": "",
   "ShutdownDelay": 60000000000,
   "GracePeriod": 30000000000,
   "PollInterval": 10000000000,

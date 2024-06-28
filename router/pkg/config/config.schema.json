@@ -572,6 +572,11 @@
       "description": "Enable the JSON log format. The JSON log format is used to log the logs in JSON format. The default value is true. If the value is false, the logs are logged a human friendly text format.",
       "default": true
     },
+    "log_destination": {
+      "type":"string",
+      "description": "Set the destination of the log output. If empty, will send logs to stdout. Default value is empty.",
+      "default": ""
+    },
     "shutdown_delay": {
       "type": "string",
       "duration": {

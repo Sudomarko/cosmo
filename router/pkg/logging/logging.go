@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,8 +18,12 @@ const (
 
 type RequestIDKey struct{}
 
-func New(prettyLogging bool, debug bool, level zapcore.Level) *zap.Logger {
-	return newZapLogger(zapcore.AddSync(os.Stdout), prettyLogging, debug, level)
+func New(prettyLogging bool, logFile *os.File, debug bool, level zapcore.Level) *zap.Logger {
+	if logFile == nil {
+		return newZapLogger(zapcore.AddSync(os.Stdout), prettyLogging, debug, level)
+	} else {
+		return newMultiWriterZapLogger(zapcore.AddSync(os.Stdout), zapcore.AddSync(logFile), prettyLogging, debug, level)
+	}
 }
 
 func zapBaseEncoderConfig() zapcore.EncoderConfig {
@@ -91,6 +96,49 @@ func newZapLogger(syncer zapcore.WriteSyncer, prettyLogging bool, debug bool, le
 	return zapLogger
 }
 
+func newMultiWriterZapLogger(consoleSyncer zapcore.WriteSyncer, fileSyncer zapcore.WriteSyncer, prettyLogging bool, debug bool, level zapcore.Level) *zap.Logger {
+	var consoleEncoder zapcore.Encoder
+	var consoleCore zapcore.Core
+	var fileEncoder zapcore.Encoder
+	var fileCore zapcore.Core
+	var zapOpts []zap.Option
+
+	if prettyLogging {
+		consoleEncoder = zapConsoleEncoder()
+	} else {
+		consoleEncoder = ZapJsonEncoder()
+	}
+
+	fileEncoder = ZapJsonEncoder()
+
+	if debug {
+		zapOpts = append(zapOpts, zap.AddCaller())
+	}
+
+	zapOpts = append(zapOpts, zap.AddStacktrace(zap.ErrorLevel))
+
+	consoleCore = zapcore.NewCore(
+		fileEncoder,
+		fileSyncer,
+		level,
+	)
+
+	fileCore = zapcore.NewCore(
+		consoleEncoder,
+		consoleSyncer,
+		level,
+	)
+
+	// Combine the cores
+	combinedCore := zapcore.NewTee(consoleCore, fileCore)
+
+	zapLogger := zap.New(combinedCore, zapOpts...)
+
+	zapLogger = attachBaseFields(zapLogger)
+
+	return zapLogger
+}
+
 func ZapLogLevelFromString(logLevel string) (zapcore.Level, error) {
 	switch strings.ToUpper(logLevel) {
 	case "DEBUG":
@@ -108,6 +156,20 @@ func ZapLogLevelFromString(logLevel string) (zapcore.Level, error) {
 	default:
 		return -1, fmt.Errorf("unknown log level: %s", logLevel)
 	}
+}
+
+func NewLogFile(destination string) (*os.File, error) {
+	if destination == "" {
+		return nil, nil
+	}
+
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.OpenFile(filepath.Join(workingDirectory, "../..", destination, "router_log.json"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	return file, err
 }
 
 func WithRequestID(reqID string) zap.Field {
