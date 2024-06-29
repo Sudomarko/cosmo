@@ -1345,3 +1345,24 @@ func TestRequestBodySizeLimit(t *testing.T) {
 		require.Equal(t, `{"errors":[{"message":"request body too large"}],"data":null}`, res.Body)
 	})
 }
+
+func TestLogFileGeneration(t *testing.T) {
+	t.Parallel()
+	testenv.Run(t, &testenv.Config{
+		ModifyLogDestinationConfig: func(cfg *string) {
+			*cfg = "./"
+		},
+	}, func(t *testing.T, xEnv *testenv.Environment) {
+		res, err := xEnv.MakeGraphQLRequest(testenv.GraphQLRequest{
+			Query: `query { employees { id } }`,
+		})
+		require.NoError(t, err)
+		require.JSONEq(t, employeesIDData, res.Body)
+		require.FileExists(t, "../router/router_log.json")
+		logFileContent, fileErr := os.ReadFile("../router/router_log.json")
+		require.NoError(t, fileErr)
+		require.True(t, strings.Contains(string(logFileContent), "\"msg\":\"/graphql\""))
+		removeErr := os.Remove("../router/router_log.json")
+		require.NoError(t, removeErr)
+	})
+}

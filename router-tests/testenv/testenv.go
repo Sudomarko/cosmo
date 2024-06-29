@@ -30,6 +30,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/wundergraph/cosmo/router/pkg/logging"
 	rmetric "github.com/wundergraph/cosmo/router/pkg/metric"
 	pubsubNats "github.com/wundergraph/cosmo/router/pkg/pubsub/nats"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/pubsub_datasource"
@@ -103,6 +104,7 @@ type Config struct {
 	ModifySubgraphErrorPropagation     func(subgraphErrorPropagation *config.SubgraphErrorPropagationConfiguration)
 	ModifyWebsocketConfiguration       func(websocketConfiguration *config.WebSocketConfiguration)
 	ModifyCDNConfig                    func(cdnConfig *config.CDNConfiguration)
+	ModifyLogDestinationConfig         func(logDestinationConfig *string)
 	KafkaSeeds                         []string
 	DisableWebSockets                  bool
 	DisableParentBasedSampler          bool
@@ -510,6 +512,15 @@ func configureRouter(listenerAddr string, testConfig *Config, routerConfig *node
 		syncer,
 		zapcore.ErrorLevel,
 	))
+
+	if testConfig.ModifyLogDestinationConfig != nil {
+		testConfig.ModifyLogDestinationConfig(&cfg.LogDestination)
+		logFile, err := logging.NewLogFile(cfg.LogDestination)
+		if err != nil {
+			return nil, err
+		}
+		zapLogger = logging.New(false, logFile, false, zapcore.InfoLevel)
+	}
 
 	t := jwt.New(jwt.SigningMethodHS256)
 	t.Claims = testTokenClaims()

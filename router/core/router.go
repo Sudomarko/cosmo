@@ -489,7 +489,7 @@ func NewRouter(opts ...Option) (*Router, error) {
 		}
 		r.cdnPersistentOpClient = routerCDN
 	}
-
+	
 	if r.developmentMode {
 		r.logger.Warn("Development mode enabled. This should only be used for testing purposes")
 	}

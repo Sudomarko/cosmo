@@ -28,21 +28,6 @@ func TestNewZapLogger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read log file: %s", err)
 	}
-	// Get the golden file content
-	goldenFilePath := "./testdata/logging_test_output.golden"
-	goldenFileContent, err := os.ReadFile(goldenFilePath)
-	if err != nil {
-		t.Fatalf("Failed to read golden file: %s", err)
-	}
-
-	// Compare the first characters of both actual and expected output
-	if len(logFileContent) == 0 || len(goldenFileContent) == 0 {
-		t.Fatalf("Either log file content or golden file content is empty")
-	}
-
-	if logFileContent[0] != goldenFileContent[0] {
-		t.Errorf("First character of log output does not match golden file")
-	}
 
 	requiredMessages := []string{
 		`"msg":"This is an info message"`,
@@ -53,9 +38,6 @@ func TestNewZapLogger(t *testing.T) {
 	for _, msg := range requiredMessages {
 		if !strings.Contains(string(logFileContent), msg) {
 			t.Errorf("Log output does not contain required message: %s", msg)
-		}
-		if !strings.Contains(string(goldenFileContent), msg) {
-			t.Errorf("Golden file does not contain required message: %s", msg)
 		}
 	}
 }

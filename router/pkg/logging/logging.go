@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -163,12 +164,14 @@ func NewLogFile(destination string) (*os.File, error) {
 		return nil, nil
 	}
 
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	// Get the current file's directory
+	_, filePath, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, fmt.Errorf("unable to get caller information")
 	}
+	currentDir := filepath.Dir(filePath)
 
-	file, err := os.OpenFile(filepath.Join(workingDirectory, "../..", destination, "router_log.json"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filepath.Join(currentDir, "../..", destination, "router_log.json"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	return file, err
 }
 
