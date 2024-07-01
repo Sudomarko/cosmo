@@ -20,6 +20,9 @@ import (
 	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+
 	"github.com/wundergraph/cosmo/router-tests/testenv"
 	"github.com/wundergraph/cosmo/router/core"
 	"github.com/wundergraph/cosmo/router/pkg/config"
@@ -1346,23 +1349,55 @@ func TestRequestBodySizeLimit(t *testing.T) {
 	})
 }
 
-func TestLogFileGeneration(t *testing.T) {
+func TestLogOfGraphQLQuery(t *testing.T) {
+	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
+	observedLogger := zap.New(observedZapCore)
 	t.Parallel()
+
 	testenv.Run(t, &testenv.Config{
-		ModifyLogDestinationConfig: func(cfg *string) {
-			*cfg = "./"
-		},
+		RouterOptions: []core.Option{core.WithLogger(
+			observedLogger,
+		)},
 	}, func(t *testing.T, xEnv *testenv.Environment) {
 		res, err := xEnv.MakeGraphQLRequest(testenv.GraphQLRequest{
 			Query: `query { employees { id } }`,
 		})
 		require.NoError(t, err)
 		require.JSONEq(t, employeesIDData, res.Body)
-		require.FileExists(t, "../router/router_log.json")
-		logFileContent, fileErr := os.ReadFile("../router/router_log.json")
-		require.NoError(t, fileErr)
-		require.True(t, strings.Contains(string(logFileContent), "\"msg\":\"/graphql\""))
-		removeErr := os.Remove("../router/router_log.json")
-		require.NoError(t, removeErr)
+
+		allLogs := observedLogs.All()
+		desiredContext := allLogs[len(allLogs)-1].Context
+		// Excluding latency and request id fields due to intrinsic variance
+		filteredContext := make([]zap.Field, 0, len(desiredContext)-2)
+		for _, field := range desiredContext {
+			if field.Key != "latency" && field.Key != "request_id" {
+				filteredContext = append(filteredContext, field)
+			}
+		}
+
+		require.ElementsMatch(t, []zap.Field{
+			zap.Int64("status", 200),
+			zap.String("method", "POST"),
+			zap.String("path", "/graphql"),
+			zap.String("query", ""),
+			zap.String("ip", "[REDACTED]"),
+			zap.String("user-agent", "Go-http-client/1.1"),
+			zap.String("config_version", ""),
+		}, filteredContext)
+
+		// Check for existence and type or latency and request id
+		latency := false
+		requestID := false
+		for _, field := range desiredContext {
+			switch field.Key {
+			case "latency":
+				latency = true
+			case "request_id":
+				requestID = true
+			}
+		}
+
+		require.True(t, latency)
+		require.True(t, requestID)
 	})
 }
